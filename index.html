@@ -308,15 +308,8 @@
 // ══════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════
-const JSONBIN_ID  = '69cfa973856a682189f730ea';
-const JSONBIN_KEY = '$2a$10$P.9D7v3syYlHt3I74G8ZauiBlB8On3qtk.QMXctI9rUqxOfiqnZgm';
-const BIN_URL     = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
-const HEADERS     = {
-  'Content-Type': 'application/json',
-  'X-Master-Key': JSONBIN_KEY,
-  'X-Bin-Versioning': 'false',
-  'X-Bin-Meta': 'false',
-};
+const JSONBIN_ID     = '69cfa973856a682189f730ea';
+const JSONBIN_ACCESS = '$2a$10$V1OlGW/u1gTxT3c1zTl/EuDjU9sdoiKAU9lxDsrKdqH1J8w6G46M.';
 const DISCOUNT_CODE  = 'SHOEDROPSHOP20';
 const DISCOUNT_SCORE = 0; // any score that beats the global #1 triggers the code
 
@@ -357,17 +350,21 @@ let globalHi     = 0;   // top score across all players
 
 async function fetchScores() {
   try {
-    const res = await fetch(BIN_URL + '/latest', {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest?meta=false`, {
       method: 'GET',
       headers: {
-        'X-Master-Key': JSONBIN_KEY,
+        'X-Access-Key': JSONBIN_ACCESS,
         'X-Bin-Meta':   'false',
       },
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      const txt = await res.text();
+      console.warn('JSONBin read error', res.status, txt);
+      return cachedScores;
+    }
     const data = await res.json();
-    // JSONBin returns the record directly when X-Bin-Meta is false
-    cachedScores = Array.isArray(data.scores) ? data.scores : [];
+    const record = data.record || data;
+    cachedScores = Array.isArray(record.scores) ? record.scores : [];
     cachedScores.sort((a,b)=>b.score-a.score);
     globalHi = cachedScores.length ? cachedScores[0].score : 0;
     return cachedScores;
@@ -379,16 +376,21 @@ async function fetchScores() {
 
 async function pushScores(scores) {
   try {
-    const res = await fetch(BIN_URL, {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}?meta=false`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_KEY,
+        'Content-Type':    'application/json',
+        'X-Access-Key':    JSONBIN_ACCESS,
         'X-Bin-Versioning': 'false',
       },
       body: JSON.stringify({ scores }),
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      const txt = await res.text();
+      console.warn('JSONBin write error', res.status, txt);
+    } else {
+      console.log('Scores saved OK');
+    }
   } catch(e) {
     console.warn('Leaderboard save failed:', e);
   }
